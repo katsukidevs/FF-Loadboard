@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dispatch Login</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
+        .login-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #status { margin-top: 15px; font-size: 0.8rem; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>Log In</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="handleLogin()">Sign In</button>
+    <div id="status">Status: Waiting for login...</div>
+</div>
+
+<script>
+    // 1. Initialize Supabase (Use your actual URL and Anon Key)
+    const supabaseUrl = 'https://cpweugzlzupkybqcycsx.supabase.co';
+    const supabaseKey = 'sb_publishable_uKTv-Rsh4d_1v8DILXcjfg_SQ_tYPZg';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    async function handleLogin() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const statusDiv = document.getElementById('status');
+
+        statusDiv.innerText = "Authenticating...";
+
+        // 2. Sign In
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password,
+        });
+
+        if (error) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Error: " + error.message;
+        } else {
+            statusDiv.style.color = "green";
+            statusDiv.innerText = "Login Success! Checking database...";
+            
+            // 3. The "Connection Check"
+            checkLoadTable();
+        }
+    }
+
+    async function checkLoadTable() {
+        const statusDiv = document.getElementById('status');
+        
+        // This tries to grab just 1 row from the loads table
+        const { data, error } = await supabase
+            .from('loads')
+            .select('id')
+            .limit(1);
+
+        if (error) {
+            statusDiv.style.color = "orange";
+            statusDiv.innerText = "Auth OK, but Loads Table check failed: " + error.message;
+        } else {
+            statusDiv.style.color = "blue";
+            statusDiv.innerText = "SUCCESS: Connected to Loads Table. Total loads found: " + data.length;
+        }
+    }
+</script>
+
+</body>
+</html>
