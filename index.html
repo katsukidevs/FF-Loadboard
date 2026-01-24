@@ -2,72 +2,91 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dispatch Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatch System | Secure Login</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
-        .login-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 300px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        #status { margin-top: 15px; font-size: 0.8rem; color: #666; }
+        :root { --primary: #2563eb; --bg: #f8fafc; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 400px; text-align: center; }
+        h1 { font-size: 1.5rem; color: #1e293b; margin-bottom: 1.5rem; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        #msg { margin-top: 1rem; font-size: 0.85rem; min-height: 1.2rem; }
+        .loader { display: none; margin: 20px auto; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<div class="login-card">
-    <h2>Log In</h2>
-    <input type="email" id="email" placeholder="Email">
-    <input type="password" id="password" placeholder="Password">
-    <button onclick="handleLogin()">Sign In</button>
-    <div id="status">Status: Waiting for login...</div>
+<div class="card" id="app">
+    <h1>Dispatch Center</h1>
+    <div id="login-form">
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="handleLogin()">Sign In</button>
+    </div>
+    <div class="loader" id="spinner"></div>
+    <div id="msg">Waiting for credentials...</div>
 </div>
 
 <script>
-    // 1. Initialize Supabase (Use your actual URL and Anon Key)
-    const supabaseUrl = 'https://cpweugzlzupkybqcycsx.supabase.co';
-    const supabaseKey = 'sb_publishable_uKTv-Rsh4d_1v8DILXcjfg_SQ_tYPZg';
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    // Configuration
+    const SB_URL = 'https://cpweugzlzupkybqcycsx.supabase.co';
+    const SB_KEY = 'sb_publishable_uKTv-Rsh4d_1v8DILXcjfg_SQ_tYPZg';
+    const supabase = supabase.createClient(SB_URL, SB_KEY);
 
     async function handleLogin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
-        const statusDiv = document.getElementById('status');
+        const msg = document.getElementById('msg');
+        const spinner = document.getElementById('spinner');
 
-        statusDiv.innerText = "Authenticating...";
+        msg.innerText = "";
+        spinner.style.display = "block";
 
-        // 2. Sign In
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password,
-        });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
-            statusDiv.style.color = "red";
-            statusDiv.innerText = "Error: " + error.message;
-        } else {
-            statusDiv.style.color = "green";
-            statusDiv.innerText = "Login Success! Checking database...";
-            
-            // 3. The "Connection Check"
-            checkLoadTable();
+            spinner.style.display = "none";
+            msg.style.color = "#ef4444";
+            msg.innerText = error.message;
+            return;
         }
+
+        msg.style.color = "#10b981";
+        msg.innerText = "Authenticated. Loading Secure View...";
+        
+        // After Auth, trigger the "Secure Load"
+        loadPrivateEngine();
     }
 
-    async function checkLoadTable() {
-        const statusDiv = document.getElementById('status');
-        
-        // This tries to grab just 1 row from the loads table
-        const { data, error } = await supabase
-            .from('loads')
-            .select('id')
-            .limit(1);
+    async function loadPrivateEngine() {
+        // 1. Check Role from the Public Profiles table
+        const { data: profile } = await supabase.from('profiles').select('role').single();
+
+        if (!profile) {
+            document.getElementById('msg').innerText = "Account verified, but profile not found.";
+            return;
+        }
+
+        // 2. Fetch the actual JS code from the PRIVATE storage bucket
+        // Note: You must create a bucket named 'vault' and upload 'engine.js' there.
+        const { data, error } = await supabase.storage.from('vault').download('engine.js');
 
         if (error) {
-            statusDiv.style.color = "orange";
-            statusDiv.innerText = "Auth OK, but Loads Table check failed: " + error.message;
+            document.getElementById('msg').innerText = "System error: Failed to download view engine.";
+            console.error(error);
         } else {
-            statusDiv.style.color = "blue";
-            statusDiv.innerText = "SUCCESS: Connected to Loads Table. Total loads found: " + data.length;
+            // 3. Inject the code into the page
+            const scriptText = await data.text();
+            const script = document.createElement('script');
+            script.text = scriptText;
+            document.head.appendChild(script);
+            
+            // Clear the login UI
+            document.getElementById('app').innerHTML = `<h1>Welcome back!</h1><p>Initializing your ${profile.role} dashboard...</p>`;
         }
     }
 </script>
