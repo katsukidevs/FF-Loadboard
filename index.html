@@ -3,47 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring System</title>
+    <title>FF Loadboard | Secure Access</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        :root { --primary: #2563eb; --bg: #0f172a; --card-bg: #1e293b; --text: #f8fafc; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         
-        /* Login State */
-        .login-card { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 100%; max-width: 360px; text-align: center; transition: all 0.5s ease; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-        
-        /* Dashboard State (Applies after login) */
-        .dashboard-mode { display: block; width: 100%; height: 100vh; align-self: flex-start; padding: 20px; box-sizing: border-box; }
-        .table-container { background: white; border-radius: 12px; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-        th { background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-        td { padding: 12px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
-        tr:hover { background: #f8fafc; }
-        .status-pill { padding: 4px 8px; border-radius: 99px; font-weight: 600; font-size: 11px; }
-        
-        .loader { display: none; margin: 20px auto; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        /* Auth UI */
+        .login-card { background: var(--card-bg); padding: 2.5rem; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); width: 100%; max-width: 380px; text-align: center; }
+        h1 { margin-top: 0; font-size: 1.75rem; color: white; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #334155; border: 1px solid #475569; border-radius: 8px; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 15px; transition: transform 0.1s; }
+        button:active { transform: scale(0.98); }
+        #msg { margin-top: 1rem; font-size: 0.9rem; color: #94a3b8; }
+
+        /* Dashboard View (Hidden until Login) */
+        #dashboard { display: none; width: 100%; max-width: 1200px; padding: 20px; box-sizing: border-box; }
+        .table-wrap { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; color: #cbd5e1; }
+        th { background: #334155; padding: 15px; text-align: left; color: #94a3b8; text-transform: uppercase; font-size: 11px; }
+        td { padding: 15px; border-bottom: 1px solid #334155; }
+        tr:hover { background: #2d3a4f; }
+        .badge { background: #065f46; color: #34d399; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+
+        .loader { display: none; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<div class="login-card" id="app-container">
-    <div id="auth-ui">
+    <div class="login-card" id="login-container">
         <h1>Dispatch Center</h1>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="handleLogin()">Sign In</button>
-        <div id="msg" style="margin-top:15px; font-size:13px; color:#64748b;">Enter credentials to access loadboard</div>
+        <div id="auth-inputs">
+            <input type="email" id="email" placeholder="Email Address">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="handleLogin()">Sign In</button>
+        </div>
+        <div class="loader" id="spinner"></div>
+        <div id="msg">System Standby</div>
     </div>
-    <div class="loader" id="spinner"></div>
-</div>
+
+    <div id="dashboard">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 id="welcome-text">Loading Board...</h2>
+            <button style="width:auto; padding:8px 16px;" onclick="location.reload()">Log Out</button>
+        </div>
+        <div class="table-wrap">
+            <table id="load-table">
+                <thead>
+                    <tr>
+                        <th>Unit ID</th>
+                        <th>Driver</th>
+                        <th>Status</th>
+                        <th>Location</th>
+                        <th>ETA</th>
+                        <th>Appt.</th>
+                    </tr>
+                </thead>
+                <tbody id="load-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
 
 <script>
+    // 1. Rename the client to 'sb' to avoid the "already declared" error
     const SB_URL = 'https://cpweugzlzupkybqcycsx.supabase.co';
     const SB_KEY = 'sb_publishable_uKTv-Rsh4d_1v8DILXcjfg_SQ_tYPZg';
-    const supabase = supabase.createClient(SB_URL, SB_KEY);
+    const sb = supabase.createClient(SB_URL, SB_KEY);
 
     async function handleLogin() {
         const email = document.getElementById('email').value;
@@ -51,39 +78,62 @@
         const msg = document.getElementById('msg');
         const spinner = document.getElementById('spinner');
 
-        msg.innerText = "Verifying...";
+        msg.innerText = "Authenticating...";
         spinner.style.display = "block";
 
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
 
         if (error) {
             spinner.style.display = "none";
-            msg.style.color = "#ef4444";
+            msg.style.color = "#fb7185";
             msg.innerText = error.message;
             return;
         }
 
-        // Transition the UI
-        document.getElementById('auth-ui').style.display = 'none';
-        msg.innerText = "Loading Secure Assets...";
-        
-        loadPrivateEngine();
+        msg.innerText = "Success! Initializing...";
+        showDashboard();
     }
 
-    async function loadPrivateEngine() {
-        // Fetch the JS from your PRIVATE bucket
-        const { data, error } = await supabase.storage.from('vault').download('engine.js');
+    async function showDashboard() {
+        // Switch UI views
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        document.body.style.justifyContent = 'flex-start';
 
-        if (error) {
-            document.getElementById('msg').innerText = "Storage Error: Access Denied to Engine.";
-        } else {
-            const scriptText = await data.text();
-            const script = document.createElement('script');
-            script.text = scriptText;
-            document.head.appendChild(script);
-            // The engine.js will now take over and build the table
+        // 2. Verify Identity (Confirming "God" status)
+        const { data: profile } = await sb.from('profiles').select('full_name, role').single();
+        if (profile) {
+            document.getElementById('welcome-text').innerText = `${profile.full_name} (${profile.role})`;
         }
+
+        // 3. Fetch Loads
+        const { data: loads, error } = await sb.from('loads').select('*').limit(20);
+        
+        const tableBody = document.getElementById('load-body');
+        
+        if (error) {
+            tableBody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
+            return;
+        }
+
+        if (loads.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6">No active loads found. Add one in Supabase to see it here!</td></tr>`;
+            return;
+        }
+
+        // 4. Draw Table Rows
+        tableBody.innerHTML = loads.map(load => `
+            <tr>
+                <td><strong>${load.unit_id || 'N/A'}</strong></td>
+                <td>${load.dr_name || 'Empty'}</td>
+                <td><span class="badge">${load.status || 'Active'}</span></td>
+                <td>${load.current_city || 'Tracking...'}</td>
+                <td>${load.eta || '-'}</td>
+                <td>${load.appt_date || ''} @ ${load.appt_time || ''}</td>
+            </tr>
+        `).join('');
     }
 </script>
+
 </body>
 </html>
