@@ -2,138 +2,288 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Loadboard | Secure Access</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FF Admin | All Loads</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
     <style>
-        :root { --primary: #2563eb; --bg: #0f172a; --card-bg: #1e293b; --text: #f8fafc; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        :root { 
+            --side-expanded: 260px; --side-collapsed: 72px;
+            --header-h: 64px; --bg: #0f172a; --card: #1e293b; --primary: #2563eb; 
+            --border: #334155;
+        }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: #f8fafc; overflow: hidden; }
+
+        /* --- Auth Styles --- */
+        #auth-ui { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg); z-index: 1000; position: relative; }
+        .login-card { background: var(--card); padding: 2.5rem; border-radius: 16px; width: 320px; text-align: center; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         
-        /* Auth UI */
-        .login-card { background: var(--card-bg); padding: 2.5rem; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); width: 100%; max-width: 380px; text-align: center; }
-        h1 { margin-top: 0; font-size: 1.75rem; color: white; }
-        input { width: 100%; padding: 12px; margin: 10px 0; background: #334155; border: 1px solid #475569; border-radius: 8px; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 15px; transition: transform 0.1s; }
-        button:active { transform: scale(0.98); }
-        #msg { margin-top: 1rem; font-size: 0.9rem; color: #94a3b8; }
+        /* --- Dashboard Grid --- */
+        #dashboard { 
+            display: none; height: 100vh; 
+            grid-template-columns: var(--side-expanded) 1fr; 
+            grid-template-rows: var(--header-h) 1fr;
+            transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #dashboard.collapsed { grid-template-columns: var(--side-collapsed) 1fr; }
 
-        /* Dashboard View (Hidden until Login) */
-        #dashboard { display: none; width: 100%; max-width: 1200px; padding: 20px; box-sizing: border-box; }
-        .table-wrap { background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid #334155; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; color: #cbd5e1; }
-        th { background: #334155; padding: 15px; text-align: left; color: #94a3b8; text-transform: uppercase; font-size: 11px; }
-        td { padding: 15px; border-bottom: 1px solid #334155; }
-        tr:hover { background: #2d3a4f; }
-        .badge { background: #065f46; color: #34d399; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        /* --- Sidebar --- */
+        aside { 
+            grid-row: 1 / 3; background: #020617; border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; padding: 0; transition: all 0.25s;
+            overflow: hidden;
+        }
 
-        .loader { display: none; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 15px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .sidebar-header {
+            height: var(--header-h); display: flex; align-items: center; padding: 0 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .toggle-btn { 
+            cursor: pointer; color: #94a3b8; user-select: none; 
+            padding: 12px; border-radius: 50%; transition: background 0.2s;
+        }
+        .toggle-btn:hover { background: var(--card); color: #fff; }
+
+        .nav-content { padding: 12px 8px; flex-grow: 1; }
+        .nav-item { 
+            display: flex; align-items: center; padding: 12px 14px; margin: 2px 0; 
+            border-radius: 24px; cursor: pointer; color: #cbd5e1; white-space: nowrap;
+        }
+        .nav-item i { margin-right: 18px; min-width: 24px; font-size: 22px; }
+        .nav-item span { font-weight: 500; transition: opacity 0.2s; }
+        
+        #dashboard.collapsed .nav-item span, 
+        #dashboard.collapsed .user-info span,
+        #dashboard.collapsed .logout-text { 
+            opacity: 0; pointer-events: none; width: 0; display: none;
+        }
+
+        .nav-item:hover { background: var(--card); color: white; }
+        .nav-item.active { background: #2d3e5d; color: #74b9ff; }
+
+        .sidebar-footer { padding: 10px 8px; border-top: 1px solid var(--border); }
+        .user-info { display: flex; align-items: center; padding: 12px 14px; font-size: 13px; color: #94a3b8; white-space: nowrap; }
+        
+        /* --- Header --- */
+        header { 
+            background: var(--card); border-bottom: 1px solid var(--border); 
+            display: flex; align-items: center; justify-content: space-between; padding: 0 24px; 
+        }
+        .header-brand { font-weight: 700; font-size: 20px; color: #fff; }
+        .header-brand span { color: var(--primary); }
+
+        /* --- Main Content & Table --- */
+        main { padding: 0; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+        
+        #table-wrapper {
+            flex: 1; overflow: auto; padding: 20px;
+        }
+
+        /* Dynamic Table Styling */
+        table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+        th { 
+            background: #1e293b; color: #94a3b8; font-weight: 600; text-align: left; 
+            padding: 12px 16px; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid var(--border);
+        }
+        td { 
+            padding: 12px 16px; border-bottom: 1px solid var(--border); color: #e2e8f0;
+        }
+        tr:hover td { background: #1e293b; }
+
+        /* --- Components --- */
+        #logout-modal { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;
+        }
+        .modal-content { background: var(--card); padding: 32px; border-radius: 20px; text-align: center; width: 320px; border: 1px solid var(--border); }
+        .modal-btns { display: flex; gap: 12px; margin-top: 24px; }
+        
+        button { border: none; border-radius: 12px; font-weight: 600; cursor: pointer; padding: 12px 24px; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-confirm { background: #ef4444; color: white; flex: 1; }
+        .btn-cancel { background: #334155; color: white; flex: 1; }
+        
+        input { 
+            padding: 14px; background: #0f172a; color: white; border: 1px solid var(--border); 
+            border-radius: 12px; width: 100%; box-sizing: border-box; outline: none; 
+        }
+        input:focus { border-color: var(--primary); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
 <body>
 
-    <div class="login-card" id="login-container">
-        <h1>Dispatch Center</h1>
-        <div id="auth-inputs">
-            <input type="email" id="email" placeholder="Email Address">
-            <input type="password" id="password" placeholder="Password">
-            <button onclick="handleLogin()">Sign In</button>
+    <div id="auth-ui">
+        <div class="login-card">
+            <h2 style="margin-bottom:24px;">FF Admin</h2>
+            <input type="email" id="email" placeholder="Email" style="margin-bottom:12px;">
+            <input type="password" id="password" placeholder="Password" style="margin-bottom:24px;">
+            <button onclick="handleLogin()" style="width:100%; background:var(--primary); color:white;">Sign In</button>
+            <p id="login-error" style="color:#ef4444; font-size:13px; margin-top:10px; display:none;"></p>
         </div>
-        <div class="loader" id="spinner"></div>
-        <div id="msg">System Standby</div>
     </div>
 
     <div id="dashboard">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 id="welcome-text">Loading Board...</h2>
-            <button style="width:auto; padding:8px 16px;" onclick="location.reload()">Log Out</button>
-        </div>
-        <div class="table-wrap">
-            <table id="load-table">
-                <thead>
-                    <tr>
-                        <th>Unit ID</th>
-                        <th>Driver</th>
-                        <th>Status</th>
-                        <th>Location</th>
-                        <th>ETA</th>
-                        <th>Appt.</th>
-                    </tr>
-                </thead>
-                <tbody id="load-body">
-                    </tbody>
-            </table>
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <i class="material-icons-round toggle-btn" onclick="toggleSidebar()">menu</i>
+            </div>
+            
+            <div class="nav-content">
+                <div class="nav-item active"><i class="material-icons-round">table_view</i> <span>Loads Table</span></div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <i class="material-icons-round">account_circle</i>
+                    <span id="user-email" style="margin-left: 18px;">user</span>
+                </div>
+                <div class="nav-item" onclick="showLogout()">
+                    <i class="material-icons-round">logout</i> 
+                    <span class="logout-text">Log out</span>
+                </div>
+            </div>
+        </aside>
+
+        <header>
+            <div class="header-brand">FF <span>LOGISTICS</span></div>
+            <div style="font-size:14px; color:#94a3b8;">God Mode: All Columns</div>
+        </header>
+
+        <main id="main-view">
+            <div id="table-wrapper">
+                <div id="loading" style="text-align:center; margin-top:50px; color:#94a3b8;">Loading data...</div>
+                <div id="table-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <div id="logout-modal">
+        <div class="modal-content">
+            <i class="material-icons-round" style="font-size:54px; color:#ef4444; margin-bottom:10px;">logout</i>
+            <h3 style="margin:10px 0;">Sign Out?</h3>
+            <div class="modal-btns">
+                <button class="btn-cancel" onclick="hideLogout()">Cancel</button>
+                <button class="btn-confirm" onclick="confirmLogout()">Confirm</button>
+            </div>
         </div>
     </div>
 
 <script>
-    // 1. Rename the client to 'sb' to avoid the "already declared" error
+    // --- CONFIGURATION ---
     const SB_URL = 'https://cpweugzlzupkybqcycsx.supabase.co';
     const SB_KEY = 'sb_publishable_uKTv-Rsh4d_1v8DILXcjfg_SQ_tYPZg';
     const sb = supabase.createClient(SB_URL, SB_KEY);
 
+    // --- INIT ---
+    window.onload = async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+            setupUI(session.user.email);
+        }
+    };
+
+    // --- AUTH LOGIC ---
     async function handleLogin() {
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
-        const msg = document.getElementById('msg');
-        const spinner = document.getElementById('spinner');
-
-        msg.innerText = "Authenticating...";
-        spinner.style.display = "block";
-
+        const errorMsg = document.getElementById('login-error');
+        
+        errorMsg.style.display = 'none';
+        
         const { data, error } = await sb.auth.signInWithPassword({ email, password });
-
-        if (error) {
-            spinner.style.display = "none";
-            msg.style.color = "#fb7185";
-            msg.innerText = error.message;
-            return;
-        }
-
-        msg.innerText = "Success! Initializing...";
-        showDashboard();
-    }
-
-    async function showDashboard() {
-        // Switch UI views
-        document.getElementById('login-container').style.display = 'none';
-        document.getElementById('dashboard').style.display = 'block';
-        document.body.style.justifyContent = 'flex-start';
-
-        // 2. Verify Identity (Confirming "God" status)
-        const { data: profile } = await sb.from('profiles').select('full_name, role').single();
-        if (profile) {
-            document.getElementById('welcome-text').innerText = `${profile.full_name} (${profile.role})`;
-        }
-
-        // 3. Fetch Loads
-        const { data: loads, error } = await sb.from('loads').select('*').limit(20);
-        
-        const tableBody = document.getElementById('load-body');
         
         if (error) {
-            tableBody.innerHTML = `<tr><td colspan="6">Error: ${error.message}</td></tr>`;
-            return;
+            errorMsg.innerText = error.message;
+            errorMsg.style.display = 'block';
+        } else {
+            setupUI(data.user.email);
         }
-
-        if (loads.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="6">No active loads found. Add one in Supabase to see it here!</td></tr>`;
-            return;
-        }
-
-        // 4. Draw Table Rows
-        tableBody.innerHTML = loads.map(load => `
-            <tr>
-                <td><strong>${load.unit_id || 'N/A'}</strong></td>
-                <td>${load.dr_name || 'Empty'}</td>
-                <td><span class="badge">${load.status || 'Active'}</span></td>
-                <td>${load.current_city || 'Tracking...'}</td>
-                <td>${load.eta || '-'}</td>
-                <td>${load.appt_date || ''} @ ${load.appt_time || ''}</td>
-            </tr>
-        `).join('');
     }
+
+    function setupUI(email) {
+        document.getElementById('auth-ui').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'grid';
+        document.getElementById('user-email').innerText = email;
+        fetchAndDisplayLoads();
+    }
+
+    async function confirmLogout() {
+        await sb.auth.signOut();
+        location.reload();
+    }
+
+    // --- DATA LOGIC ---
+    async function fetchAndDisplayLoads() {
+        const loading = document.getElementById('loading');
+        const container = document.getElementById('table-container');
+
+        // Fetch ALL columns from 'loads'
+        const { data, error } = await sb.from('loads').select('*');
+
+        loading.style.display = 'none';
+
+        if (error) {
+            container.innerHTML = `<div style="color:#ef4444; padding:20px;">Error fetching loads: ${error.message}</div>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            container.innerHTML = `<div style="padding:20px; color:#94a3b8;">No records found in 'loads' table.</div>`;
+            return;
+        }
+
+        // Generate Dynamic Table
+        renderTable(data, container);
+    }
+
+    function renderTable(data, container) {
+        // Get all unique keys from the first object to form headers
+        const columns = Object.keys(data[0]);
+
+        let html = '<table><thead><tr>';
+        
+        // Headers
+        columns.forEach(col => {
+            html += `<th>${col}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        // Rows
+        data.forEach(row => {
+            html += '<tr>';
+            columns.forEach(col => {
+                let cellData = row[col];
+                
+                // Format if object/array (JSON)
+                if (typeof cellData === 'object' && cellData !== null) {
+                    cellData = JSON.stringify(cellData).substring(0, 50) + '...';
+                }
+                // Handle nulls
+                if (cellData === null || cellData === undefined) {
+                    cellData = '<span style="color:#475569">-</span>';
+                }
+
+                html += `<td>${cellData}</td>`;
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    // --- UI HELPERS ---
+    function toggleSidebar() { document.getElementById('dashboard').classList.toggle('collapsed'); }
+    function showLogout() { document.getElementById('logout-modal').style.display = 'flex'; }
+    function hideLogout() { document.getElementById('logout-modal').style.display = 'none'; }
 </script>
-
 </body>
 </html>
